@@ -85,8 +85,8 @@ services:
         state.checkpoints.dir: file:///flink-checkpoints
         state.savepoints.dir: file:///flink-savepoints
     volumes:
-      - ./flink-checkpoints:/flink-checkpoints
-      - ./flink-savepoints:/flink-savepoints
+      - ./flink-checkpoints-data:/flink-checkpoints
+      - ./flink-savepoints-data:/flink-savepoints
     command: jobmanager
     networks: [dev-net]
 
@@ -103,8 +103,8 @@ services:
         blob.server.port: 6124
         query.server.port: 6125
     volumes:
-      - ./flink-checkpoints:/flink-checkpoints
-      - ./flink-savepoints:/flink-savepoints
+      - ./flink-checkpoints-data:/flink-checkpoints
+      - ./flink-savepoints-data:/flink-savepoints
     command: taskmanager
     networks: [dev-net]
 

@@ -34,3 +34,5 @@ out/
 ### logs ###
 *.log
 logs/
+
+*-data
