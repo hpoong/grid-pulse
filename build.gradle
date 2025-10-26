@@ -29,8 +29,16 @@ dependencies {
 	implementation "org.apache.flink:flink-cep:1.20.2"
 
 	// Connectors (Flink 1.20 전용 버전)
-	implementation "org.apache.flink:flink-connector-kafka:3.3.0-1.20"          // 1.20 문서 권고 버전
-	implementation "org.apache.flink:flink-connector-elasticsearch7:3.1.0-1.20"  // ES 7.x용
+	implementation "org.apache.flink:flink-connector-kafka:3.3.0-1.20"
+	implementation "org.apache.flink:flink-connector-elasticsearch7:3.1.0-1.20"
+
+	// kafka
+	implementation 'org.springframework.kafka:spring-kafka'
+	implementation 'org.apache.kafka:kafka-streams'
+
+	// elasticsearch
+	implementation 'co.elastic.clients:elasticsearch-java:8.12.0'
+	implementation 'org.apache.httpcomponents.client5:httpclient5:5.2'
 
 	// lombok
 	compileOnly 'org.projectlombok:lombok:1.18.32'
