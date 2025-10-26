@@ -1,0 +1,10 @@
+
+
+server:
+  port: 2343
+
+
+logging:
+  config: classpath:logback/logback-srping.xml
+  level:
+    root: info

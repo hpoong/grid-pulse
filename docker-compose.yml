@@ -1,0 +1,116 @@
+services:
+  # ---------------- Kafka & Zookeeper ----------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.8.0
+    container_name: grid-pulse-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks: [dev-net]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.8.0
+    container_name: grid-pulse-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # 리스너 바인딩(컨테이너 내부 바인딩 주소)
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_INTERNAL://:29092
+      # 외부/내부에서 접근할 때 알려줄 주소
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      # 단일 브로커 트랜잭션 로그(권장)
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    volumes:
+      - grid-pulse-kafka-data:/var/lib/kafka/data
+    networks: [dev-net]
+
+
+  # ---------------- Elasticsearch ----------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: grid-pulse-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    volumes:
+      - ./elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    networks: [dev-net]
+
+  # ---------------- Kibana (7.10.2) ----------------
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.0
+    container_name: grid-pulse-kibana
+    depends_on: [ elasticsearch ]
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+    ports:
+      - "5601:5601"
+    networks: [ dev-net ]
+
+
+  # ---------------- flink ----------------
+
+  jobmanager:
+    image: flink:1.20.2-java17
+    container_name: grid-pulse-flink-jobmanager
+    ports:
+      - "8082:8081"
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        rest.port: 8081
+        blob.server.port: 6124
+        query.server.port: 6125
+        taskmanager.numberOfTaskSlots: 2
+        state.checkpoints.dir: file:///flink-checkpoints
+        state.savepoints.dir: file:///flink-savepoints
+    volumes:
+      - ./flink-checkpoints:/flink-checkpoints
+      - ./flink-savepoints:/flink-savepoints
+    command: jobmanager
+    networks: [dev-net]
+
+  taskmanager:
+    image: flink:1.20.2-java17
+    container_name: grid-pulse-flink-taskmanager
+    depends_on:
+      - jobmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: 2
+        blob.server.port: 6124
+        query.server.port: 6125
+    volumes:
+      - ./flink-checkpoints:/flink-checkpoints
+      - ./flink-savepoints:/flink-savepoints
+    command: taskmanager
+    networks: [dev-net]
+
+volumes:
+  grid-pulse-kafka-data:
+
+networks:
+  dev-net:
+    driver: bridge
