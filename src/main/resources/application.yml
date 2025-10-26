@@ -4,6 +4,22 @@ server:
   port: 2343
 
 
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: -1
+
+elasticsearch:
+  host: localhost
+  port: 9200
+  scheme: http
+
 logging:
   config: classpath:logback/logback-srping.xml
   level:
