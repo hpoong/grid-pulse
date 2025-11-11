@@ -1,13 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.3.1'
     id 'io.spring.dependency-management' version '1.1.5'
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
 }
 
 allprojects {
@@ -18,17 +11,19 @@ allprojects {
 
 subprojects {
     apply plugin: 'java'
+    
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(17)
+        }
+    }
 
     dependencies {
         compileOnly("org.projectlombok:lombok")
         annotationProcessor("org.projectlombok:lombok")
     }
-}
-
-
-dependencies {}
-
-
-tasks.named('test') {
-    useJUnitPlatform()
+    
+    tasks.named('test') {
+        useJUnitPlatform()
+    }
 }
