@@ -1,54 +1,34 @@
 plugins {
-	id 'java'
-	id 'org.springframework.boot' version '3.3.1'
-	id 'io.spring.dependency-management' version '1.1.5'
+    id 'java'
+    id 'org.springframework.boot' version '3.3.1'
+    id 'io.spring.dependency-management' version '1.1.5'
 }
-
-group = 'com.hopoong'
-version = '0.0.1-SNAPSHOT'
 
 java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(17)
-	}
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+allprojects {
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+
+    dependencies {
+        compileOnly("org.projectlombok:lombok")
+        annotationProcessor("org.projectlombok:lombok")
+    }
 }
 
 
-repositories {
-	mavenCentral()
-}
+dependencies {}
 
-dependencies {
-
-	// springframework
-	implementation 'org.springframework.boot:spring-boot-starter-web'		// web
-
-	// Flink Core
-	implementation "org.apache.flink:flink-streaming-java:1.20.2"
-	implementation "org.apache.flink:flink-clients:1.20.2"
-	implementation "org.apache.flink:flink-cep:1.20.2"
-
-	// Connectors (Flink 1.20 전용 버전)
-	implementation "org.apache.flink:flink-connector-kafka:3.3.0-1.20"
-	implementation "org.apache.flink:flink-connector-elasticsearch7:3.1.0-1.20"
-
-	// kafka
-	implementation 'org.springframework.kafka:spring-kafka'
-	implementation 'org.apache.kafka:kafka-streams'
-
-	// elasticsearch
-	implementation 'co.elastic.clients:elasticsearch-java:8.12.0'
-	implementation 'org.apache.httpcomponents.client5:httpclient5:5.2'
-
-	// lombok
-	compileOnly 'org.projectlombok:lombok:1.18.32'
-	annotationProcessor 'org.projectlombok:lombok:1.18.32'
-
-	// test
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
 
 tasks.named('test') {
-	useJUnitPlatform()
+    useJUnitPlatform()
 }
