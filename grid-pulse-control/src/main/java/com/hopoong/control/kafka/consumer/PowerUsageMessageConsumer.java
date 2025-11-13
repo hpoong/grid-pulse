@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-public class PowerUsageMesaageConsumer {
+public class PowerUsageMessageConsumer {
 
     @KafkaListener(
             topics = KafkaTopicManager.POWER_USAGE_METRICS_TOPIC,
