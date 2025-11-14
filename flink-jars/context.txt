@@ -1,0 +1,1 @@
+flink run -c com.hopoong.flink.GridPulseFlinkApplication /opt/flink/usr/grid-pulse-flink-0.0.1-SNAPSHOT.jar
