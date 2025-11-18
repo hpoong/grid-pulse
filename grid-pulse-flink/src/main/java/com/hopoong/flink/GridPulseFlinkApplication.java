@@ -42,7 +42,7 @@ import java.time.format.DateTimeFormatter;
 public class GridPulseFlinkApplication {
 
     // Kafka 설정
-    private static final String KAFKA_BOOTSTRAP_SERVERS = "192.168.0.138:9092";
+    private static final String KAFKA_BOOTSTRAP_SERVERS = "kafka:29092";
     private static final String KAFKA_TOPIC = "power-usage-metrics";
     private static final String CONSUMER_GROUP_ID = "flink-power-usage-aggregator";
 
