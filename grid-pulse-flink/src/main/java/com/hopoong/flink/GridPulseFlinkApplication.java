@@ -6,18 +6,14 @@ import com.hopoong.flink.model.PowerUsageAggregation;
 import com.hopoong.flink.model.PowerUsageMessage;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
-import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
-import org.apache.flink.streaming.api.windowing.time.Time;
+import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
-
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -42,7 +38,8 @@ import java.time.format.DateTimeFormatter;
 public class GridPulseFlinkApplication {
 
     // Kafka 설정
-    private static final String KAFKA_BOOTSTRAP_SERVERS = "kafka:29092";
+    private static final String PROD_KAFKA_BOOTSTRAP_SERVERS = "kafka:29092";
+    private static final String DEV_KAFKA_BOOTSTRAP_SERVERS = "localhost:9092";
     private static final String KAFKA_TOPIC = "power-usage-metrics";
     private static final String CONSUMER_GROUP_ID = "flink-power-usage-aggregator";
 
@@ -66,26 +63,24 @@ public class GridPulseFlinkApplication {
         // 2. Kafka Source 설정
         // ============================================
         KafkaSource<PowerUsageMessage> kafkaSource = KafkaSource.<PowerUsageMessage>builder()
-                .setBootstrapServers(KAFKA_BOOTSTRAP_SERVERS)
+                .setBootstrapServers(DEV_KAFKA_BOOTSTRAP_SERVERS)
                 .setTopics(KAFKA_TOPIC)
                 .setGroupId(CONSUMER_GROUP_ID)
                 .setStartingOffsets(OffsetsInitializer.latest()) // 최신 메시지부터 읽기
+//                .setStartingOffsets(OffsetsInitializer.earliest())
                 .setValueOnlyDeserializer(new PowerUsageMessageDeserializer())
                 .build();
 
         // ============================================
         // 3. Kafka에서 데이터 스트림 생성
         // ============================================
-        // WatermarkStrategy: 이벤트 시간 기반 처리
-        // - 이벤트 시간: 메시지의 timestamp 필드 사용
-        // - Watermark: 지연된 데이터를 처리하기 위한 시간 기준
+        // 처리 시간(Processing Time) 기반
+        // - 장점: 즉시 윈도우가 닫히고 결과 출력
+        // - 단점: 이벤트 시간 기반 정확도는 떨어짐
         DataStream<PowerUsageMessage> powerUsageStream = env
                 .fromSource(
                         kafkaSource,
-                        WatermarkStrategy.<PowerUsageMessage>forBoundedOutOfOrderness(
-                                Duration.ofSeconds(10) // 10초 지연 허용
-                        )
-                        .withTimestampAssigner((event, timestamp) -> event.getTimestamp()),
+                        WatermarkStrategy.noWatermarks(), // 처리 시간 사용 시 Watermark 불필요
                         "Kafka Source"
                 );
 
@@ -140,14 +135,26 @@ public class GridPulseFlinkApplication {
             StreamExecutionEnvironment env) {
 
         stream
+                // 디버깅: KeyBy 전 데이터 확인
+                .map(msg -> {
+                    System.out.println(String.format(
+                            "[DEBUG] KeyBy 전 - SiteId: %s, Timestamp: %s, Usage: %.2f",
+                            msg.getSiteId(),
+                            formatter.format(Instant.ofEpochMilli(msg.getTimestamp())),
+                            msg.getUsageKw()
+                    ));
+                    return msg;
+                })
                 // KeyBy: siteId를 기준으로 데이터를 그룹화
                 // 같은 siteId를 가진 데이터끼리 묶어서 집계
                 .keyBy(PowerUsageMessage::getSiteId)
                 
                 // Window: 시간 기반 윈도우 생성
-                // TumblingEventTimeWindows: 고정 크기 윈도우 (겹치지 않음)
-                // 예: 1분 윈도우면 00:00-00:01, 00:01-00:02, ... 이런 식으로 구분
-                .window(TumblingEventTimeWindows.of(java.time.Duration.ofMinutes(windowSizeMinutes)))
+                // TumblingProcessingTimeWindows: 처리 시간 기반 고정 크기 윈도우
+                // - 시스템 시간 기준으로 윈도우가 닫힘 (즉시 작동)
+                // - TumblingEventTimeWindows: 이벤트 시간 기준 (Watermark 필요, 지연 가능)
+                // 예: 3분 윈도우면 현재 시간 기준으로 3분마다 윈도우가 닫힘
+                .window(TumblingProcessingTimeWindows.of(java.time.Duration.ofMinutes(windowSizeMinutes)))
                 
                 // Aggregate: 윈도우 내의 데이터를 집계
                 // AggregateFunction: 각 메시지가 들어올 때마다 누적기에 값 추가
@@ -173,6 +180,21 @@ public class GridPulseFlinkApplication {
                                 
                                 // 윈도우 정보 추가
                                 TimeWindow window = context.window();
+                                
+                                // 디버깅: 윈도우가 닫혔는지 확인
+                                System.out.println(String.format(
+                                        "[DEBUG] 윈도우 닫힘 - SiteId: %s, Window: %s ~ %s",
+                                        key,
+                                        formatter.format(Instant.ofEpochMilli(window.getStart())),
+                                        formatter.format(Instant.ofEpochMilli(window.getEnd()))
+                                ));
+//
+                                // elements가 비어있지 않은지 확인
+                                if (!elements.iterator().hasNext()) {
+                                    System.out.println("[WARN] 윈도우에 데이터가 없습니다!");
+                                    return;
+                                }
+                                
                                 PowerUsageAggregation aggregation = elements.iterator().next();
                                 
                                 aggregation.setWindowStart(window.getStart());
