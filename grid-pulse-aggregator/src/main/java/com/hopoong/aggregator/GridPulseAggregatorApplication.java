@@ -1,9 +1,9 @@
-package com.hopoong.flink;
+package com.hopoong.aggregator;
 
-import com.hopoong.flink.aggregation.PowerUsageAggregateFunction;
-import com.hopoong.flink.deserializer.PowerUsageMessageDeserializer;
-import com.hopoong.flink.model.PowerUsageAggregation;
-import com.hopoong.flink.model.PowerUsageMessage;
+import com.hopoong.aggregator.processor.PowerUsageAggregateFunction;
+import com.hopoong.aggregator.deserializer.PowerUsageMessageDeserializer;
+import com.hopoong.aggregator.model.PowerUsageAggregation;
+import com.hopoong.aggregator.model.PowerUsageMessage;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.connector.kafka.source.KafkaSource;
@@ -35,7 +35,7 @@ import java.time.format.DateTimeFormatter;
  * - Aggregate: 윈도우 내의 데이터를 집계
  * - Sink: 결과를 출력하는 곳 (현재는 print)
  */
-public class GridPulseFlinkApplication {
+public class GridPulseAggregatorApplication {
 
     // Kafka 설정
     private static final String PROD_KAFKA_BOOTSTRAP_SERVERS = "kafka:29092";

@@ -1,4 +1,4 @@
-package com.hopoong.flink.model;
+package com.hopoong.aggregator.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

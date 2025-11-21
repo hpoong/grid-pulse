@@ -1,8 +1,8 @@
-package com.hopoong.flink.deserializer;
+package com.hopoong.aggregator.deserializer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.hopoong.flink.model.PowerUsageMessage;
+import com.hopoong.aggregator.model.PowerUsageMessage;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 

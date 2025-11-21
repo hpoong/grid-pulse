@@ -1,6 +1,6 @@
 rootProject.name = 'grid-pulse'
 include(
         "grid-pulse-control",
-        "grid-pulse-flink",
+        "grid-pulse-aggregator",
 )
 

@@ -1,7 +1,7 @@
-package com.hopoong.flink.aggregation;
+package com.hopoong.aggregator.processor;
 
-import com.hopoong.flink.model.PowerUsageAggregation;
-import com.hopoong.flink.model.PowerUsageMessage;
+import com.hopoong.aggregator.model.PowerUsageAggregation;
+import com.hopoong.aggregator.model.PowerUsageMessage;
 import org.apache.flink.api.common.functions.AggregateFunction;
 
 /**
