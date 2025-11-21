@@ -47,7 +47,7 @@ services:
       - bootstrap.memory_lock=true
       - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
     volumes:
-      - ./elasticsearch-data:/usr/share/elasticsearch/data
+      - ./docker-data/elasticsearch-data:/usr/share/elasticsearch/data
     ports:
       - "9200:9200"
     ulimits:
@@ -86,8 +86,8 @@ services:
         state.checkpoints.dir: file:///flink-checkpoints
         state.savepoints.dir: file:///flink-savepoints
     volumes:
-      - ./flink-checkpoints-data:/flink-checkpoints
-      - ./flink-savepoints-data:/flink-savepoints
+      - ./docker-data/flink-checkpoints-data:/flink-checkpoints
+      - ./docker-data/flink-savepoints-data:/flink-savepoints
       - ./flink-jars:/opt/flink/usr
     command: jobmanager
     networks: [dev-net]
@@ -105,8 +105,8 @@ services:
         blob.server.port: 6124
         query.server.port: 6125
     volumes:
-      - ./flink-checkpoints-data:/flink-checkpoints
-      - ./flink-savepoints-data:/flink-savepoints
+      - ./docker-data/flink-checkpoints-data:/flink-checkpoints
+      - ./docker-data/flink-savepoints-data:/flink-savepoints
       - ./flink-jars:/opt/flink/usr
     command: taskmanager
     networks: [dev-net]
