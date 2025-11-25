@@ -1,5 +1,6 @@
 package com.hopoong.aggregator;
 
+import com.hopoong.aggregator.elastic.PowerUsageElasticsearchSink;
 import com.hopoong.aggregator.processor.PowerUsageAggregateFunction;
 import com.hopoong.aggregator.deserializer.PowerUsageMessageDeserializer;
 import com.hopoong.aggregator.model.PowerUsageAggregation;
@@ -38,10 +39,16 @@ import java.time.format.DateTimeFormatter;
 public class GridPulseAggregatorApplication {
 
     // Kafka 설정
-    private static final String PROD_KAFKA_BOOTSTRAP_SERVERS = "kafka:29092";
+//    private static final String PROD_KAFKA_BOOTSTRAP_SERVERS = "kafka:29092";
     private static final String DEV_KAFKA_BOOTSTRAP_SERVERS = "localhost:9092";
     private static final String KAFKA_TOPIC = "power-usage-metrics";
     private static final String CONSUMER_GROUP_ID = "flink-power-usage-aggregator";
+
+    // Elasticsearch 설정
+    private static final String ES_HOST = "localhost";
+    private static final int ES_PORT = 9200;
+    private static final String ES_SCHEME = "http";
+
 
     // 날짜 포맷터 (로그 출력용)
     private static final DateTimeFormatter formatter = 
@@ -134,39 +141,29 @@ public class GridPulseAggregatorApplication {
             String jobName,
             StreamExecutionEnvironment env) {
 
-        stream
-                // 디버깅: KeyBy 전 데이터 확인
-                .map(msg -> {
-                    System.out.println(String.format(
-                            "[DEBUG] KeyBy 전 - SiteId: %s, Timestamp: %s, Usage: %.2f",
-                            msg.getSiteId(),
-                            formatter.format(Instant.ofEpochMilli(msg.getTimestamp())),
-                            msg.getUsageKw()
-                    ));
-                    return msg;
-                })
-                // KeyBy: siteId를 기준으로 데이터를 그룹화
-                // 같은 siteId를 가진 데이터끼리 묶어서 집계
-                .keyBy(PowerUsageMessage::getSiteId)
-                
-                // Window: 시간 기반 윈도우 생성
-                // TumblingProcessingTimeWindows: 처리 시간 기반 고정 크기 윈도우
-                // - 시스템 시간 기준으로 윈도우가 닫힘 (즉시 작동)
-                // - TumblingEventTimeWindows: 이벤트 시간 기준 (Watermark 필요, 지연 가능)
-                // 예: 3분 윈도우면 현재 시간 기준으로 3분마다 윈도우가 닫힘
-                .window(TumblingProcessingTimeWindows.of(java.time.Duration.ofMinutes(windowSizeMinutes)))
-                
-                // Aggregate: 윈도우 내의 데이터를 집계
-                // AggregateFunction: 각 메시지가 들어올 때마다 누적기에 값 추가
-                // ProcessWindowFunction: 윈도우가 끝날 때 윈도우 정보(시작/종료 시간) 추가
-                .aggregate(
-                        new PowerUsageAggregateFunction(windowSizeMinutes),
-                        new ProcessWindowFunction<
-                                PowerUsageAggregation,
-                                PowerUsageAggregation,
-                                String,
-                                TimeWindow>() {
-                            
+        DataStream<PowerUsageAggregation> aggStream = stream
+            // KeyBy: siteId를 기준으로 데이터를 그룹화
+            // 같은 siteId를 가진 데이터끼리 묶어서 집계
+            .keyBy(PowerUsageMessage::getSiteId)
+
+            // Window: 시간 기반 윈도우 생성
+            // TumblingProcessingTimeWindows: 처리 시간 기반 고정 크기 윈도우
+            // - 시스템 시간 기준으로 윈도우가 닫힘 (즉시 작동)
+            // - TumblingEventTimeWindows: 이벤트 시간 기준 (Watermark 필요, 지연 가능)
+            // 예: 3분 윈도우면 현재 시간 기준으로 3분마다 윈도우가 닫힘
+            .window(TumblingProcessingTimeWindows.of(java.time.Duration.ofMinutes(windowSizeMinutes)))
+
+            // Aggregate: 윈도우 내의 데이터를 집계
+            // AggregateFunction: 각 메시지가 들어올 때마다 누적기에 값 추가
+            // ProcessWindowFunction: 윈도우가 끝날 때 윈도우 정보(시작/종료 시간) 추가
+            .aggregate(
+                    new PowerUsageAggregateFunction(windowSizeMinutes),
+                    new ProcessWindowFunction<
+                            PowerUsageAggregation,
+                            PowerUsageAggregation,
+                            String,
+                            TimeWindow>() {
+
                             @Override
                             public void process(
                                     String key, // siteId
@@ -177,10 +174,10 @@ public class GridPulseAggregatorApplication {
                                             TimeWindow>.Context context,
                                     Iterable<PowerUsageAggregation> elements,
                                     Collector<PowerUsageAggregation> out) throws Exception {
-                                
+
                                 // 윈도우 정보 추가
                                 TimeWindow window = context.window();
-                                
+
                                 // 디버깅: 윈도우가 닫혔는지 확인
                                 System.out.println(String.format(
                                         "[DEBUG] 윈도우 닫힘 - SiteId: %s, Window: %s ~ %s",
@@ -188,41 +185,48 @@ public class GridPulseAggregatorApplication {
                                         formatter.format(Instant.ofEpochMilli(window.getStart())),
                                         formatter.format(Instant.ofEpochMilli(window.getEnd()))
                                 ));
-//
+        //
                                 // elements가 비어있지 않은지 확인
                                 if (!elements.iterator().hasNext()) {
-                                    System.out.println("[WARN] 윈도우에 데이터가 없습니다!");
-                                    return;
+                                        System.out.println("[WARN] 윈도우에 데이터가 없습니다!");
+                                        return;
                                 }
-                                
+
                                 PowerUsageAggregation aggregation = elements.iterator().next();
-                                
+
                                 aggregation.setWindowStart(window.getStart());
                                 aggregation.setWindowEnd(window.getEnd());
-                                
+
                                 out.collect(aggregation);
                             }
-                        })
+                    });
                 
-                // 결과 출력
-                .map(new MapFunction<PowerUsageAggregation, String>() {
-                    @Override
-                    public String map(PowerUsageAggregation agg) throws Exception {
-                        return String.format(
-                                "[%s] SiteId: %s, Window: %s ~ %s, Count: %d, " +
-                                "Avg: %.2f kW, Max: %.2f kW, Min: %.2f kW, Sum: %.2f kW",
-                                jobName,
-                                agg.getSiteId(),
-                                formatter.format(Instant.ofEpochMilli(agg.getWindowStart())),
-                                formatter.format(Instant.ofEpochMilli(agg.getWindowEnd())),
-                                agg.getCount(),
-                                agg.getAvgUsageKw(),
-                                agg.getMaxUsageKw(),
-                                agg.getMinUsageKw(),
-                                agg.getSumUsageKw()
-                        );
-                    }
-                })
-                .print(jobName + " 결과");
+        // 결과 출력
+        aggStream.map(new MapFunction<PowerUsageAggregation, String>() {
+                @Override
+                public String map(PowerUsageAggregation agg) throws Exception {
+                return String.format(
+                        "[%s] SiteId: %s, Window: %s ~ %s, Count: %d, " +
+                        "Avg: %.2f kW, Max: %.2f kW, Min: %.2f kW, Sum: %.2f kW",
+                        jobName,
+                        agg.getSiteId(),
+                        formatter.format(Instant.ofEpochMilli(agg.getWindowStart())),
+                        formatter.format(Instant.ofEpochMilli(agg.getWindowEnd())),
+                        agg.getCount(),
+                        agg.getAvgUsageKw(),
+                        agg.getMaxUsageKw(),
+                        agg.getMinUsageKw(),
+                        agg.getSumUsageKw()
+                );
+                }
+        })
+        .print(jobName + " 결과");
+
+
+        aggStream.addSink(new PowerUsageElasticsearchSink(
+            ES_HOST, ES_PORT, ES_SCHEME, "power-usage-agg"))
+            .name(jobName + " ES Sink");
     }
+
+    
 }
